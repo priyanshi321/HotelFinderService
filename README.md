@@ -1,4 +1,4 @@
- Hotel Booking System
+Hotel Booking System
 The Hotel Booking System is a simplified platform allowing users to book hotel rooms, check availability, retrieve booking details, and cancel bookings.
 The system manages hotel data, room availability, and bookings, with concurrency controls to prevent overbooking
 
