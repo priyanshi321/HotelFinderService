@@ -3,7 +3,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import com.example.HotelBookingService.Entity.HotelBooking;
 import com.example.HotelBookingService.Entity.HotelDetails;
 import com.example.HotelBookingService.ExceptionHandler.RoomBookingException;
-import com.example.HotelBookingService.Repository.HashIdRepository;
 import com.example.HotelBookingService.Repository.HotelBookingRepository;
 import com.example.HotelBookingService.Service.HotelBookingService;
 import com.example.HotelBookingService.Service.HotelDetailsService;
@@ -15,7 +14,6 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-
 import java.time.LocalDateTime;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,57 +23,48 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class HotelBookingServiceApplicationTests {
 
     @Autowired
-    private HotelBookingService hotelBookingService; // Autowiring the service
-
-    @Mock
-    private HotelDetailsService hotelDetailsService; // Mocking the HotelDetailsService
-
-    @Mock
-    private HotelBookingValidation hotelBookingValidation; // Mocking the HotelBookingValidation
+    private HotelBookingService hotelBookingService;
 
     @Autowired
-    private HotelBookingRepository hotelBookingRepository; // Autowiring the repository
+    private HotelDetailsService hotelDetailsService;
+
+    @Mock
+    private HotelBookingValidation hotelBookingValidation;
 
     @Autowired
-    private HashIdRepository hashIdRepository; // Autowiring the HashIdRepository
+    private HotelBookingRepository hotelBookingRepository;
 
     private HotelBooking booking;
 
     @BeforeEach
     public void setUp() {
-        MockitoAnnotations.openMocks(this); 
-        booking = new HotelBooking();
-        booking.setHotelId(1L);
-        booking.setLocation("Bangalore");
-        booking.setCustomerId(156L);
-        booking.setBookingId("7a133b7b-7c65-410c-8c3f-061498892efa");
-        booking.setCheckinDate(LocalDateTime.parse("2024-11-04T14:00:00"));
-        booking.setCheckoutDate(LocalDateTime.parse("2024-11-07T14:00:00"));
-        booking.setNumberOfRooms(3);
-
+        MockitoAnnotations.openMocks(this);
         HotelDetails hotelDetails = new HotelDetails();
-       hotelDetails.setHotelId(1L);
-       hotelDetails.setCharge(234D);
-       hotelDetails.setLocation("Bangalore");
-       hotelDetails.setStatus("Available");
-       hotelDetails.setNumberOfRooms(3);
-       hotelDetails.generateRoomIds();
+        hotelDetails.setHotelId(1L);
+        hotelDetails.setCharge(234D);
+        hotelDetails.setLocation("Bangalore");
+        hotelDetails.setStatus("Available");
+        hotelDetails.setNumberOfRooms(3);
+        hotelDetailsService.createHotelWithRooms(hotelDetails);
 
-        Mocking the hotelDetailsService to return the hotel details when requested
-        when(hotelDetailsService.getHotelById(1L)).thenReturn(hotelDetails);
     }
+
+
 
     @Test
     public void testConcurrentBooking() throws InterruptedException {
         CountDownLatch latch = new CountDownLatch(1);
         AtomicInteger successfulBookings = new AtomicInteger(0);
+        Long hotelId = 1L;
+        HotelBooking bookingRequest1 = createBookingRequest(hotelId, 3, 1L, "Bangalore");
+        HotelBooking bookingRequest2 = createBookingRequest(hotelId, 3, 2L, "Bangalore");
 
         System.out.println("Starting test for concurrent booking");
 
         Thread thread1 = new Thread(() -> {
             try {
                 latch.await();
-                hotelBookingService.createBooking(booking);
+                hotelBookingService.createBooking(bookingRequest1);
                 successfulBookings.incrementAndGet();
             } catch (RoomBookingException | InterruptedException e) {
                 System.out.println("Thread 1 failed: " + e.getMessage());
@@ -85,7 +74,7 @@ public class HotelBookingServiceApplicationTests {
         Thread thread2 = new Thread(() -> {
             try {
                 latch.await();
-                hotelBookingService.createBooking(booking);
+                hotelBookingService.createBooking(bookingRequest2);
                 successfulBookings.incrementAndGet();
             } catch (RoomBookingException | InterruptedException e) {
                 System.out.println("Thread 2 failed: " + e.getMessage());
@@ -103,5 +92,20 @@ public class HotelBookingServiceApplicationTests {
         System.out.println("Total successful bookings: " + successfulBookings.get());
         assertEquals(1, successfulBookings.get(), "Only one booking should succeed due to concurrency constraints.");
         assertEquals(1, hotelBookingRepository.count(), "Repository should contain exactly one booking.");
+    }
+    private HotelBooking createBookingRequest(Long hotelId, int numberOfRooms, Long customerId, String location) {
+        HotelBooking booking = new HotelBooking();
+        booking.setHotelId(hotelId);
+        booking.setNumberOfRooms(numberOfRooms);
+        LocalDateTime checkinDate = LocalDateTime.parse("2024-11-04T14:00:00");
+        LocalDateTime checkoutDate = checkinDate.plusDays(1);
+        booking.setCustomerId(customerId);
+        booking.setLocation(location);
+        booking.setCheckinDate(checkinDate);
+        booking.setCheckoutDate(checkoutDate);
+        booking.setPaymentStatus("Pending");
+        booking.setBookingStatus("Pending");
+        System.out.printf("Created booking request: %s%n", booking);
+        return booking;
     }
 }
